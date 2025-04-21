@@ -1,0 +1,529 @@
+---
+title: "EVALUACIÓN MÓDULO 2B"
+author: "Marta Pellicer Navarro"
+date: "2025-03-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# Análisis del dataset `Bombas_training.csv`
+
+El dataset a analizar, del que no se tiene ningún tipo de información, contiene detalles del estado de situación de diversas bombas de agua instaladas en Tanzania, país situado en la costa este de África Central y cuya capital es la ciudad de Dodoma.
+
+## 1. Carga de librerías y lectura de datos
+
+```{r libraries}
+library(tidytable)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(forcats)
+library(magrittr)
+library(ggpmisc)
+library(readr)
+library(formattable)
+```
+
+Cargamos el conjunto de datos relativo a las bombas de agua localizadas en Tanzania:
+
+```{r Carga de datos}
+df = fread("C:/Users/Asus/Desktop/DIPLOMA EXPERTA/CURSO/MODULO2/EVALUACION/Entrega/Bombas_training.csv") %>% as.data.table()
+```
+
+Visualicemos la cabecera de nuestro dataset:
+
+```{r head df}
+head(df)
+```
+
+El conjunto de datos consta de $59400$ filas y $40$ columnas, por lo que tenemos $40$ variables posibles a analizar, lo que implica que el dataset tiene un tamaño de $2376000$ datos.
+
+```{r tamaño dataset}
+print(nrow(df)*ncol(df))
+```
+
+Veamos el tipo de variables con las que estamos trabajando y cómo están clasificadas:
+
+```{r summary}
+glimpse(df)
+```
+
+Gracias a la función `glimpse` obtenemos un resumen de los tipos de las variables con las que vamos a trabajar. Cabe destacar:
+
+-   **amount_tsh**: podría referirse a la cantidad de carga estática total hídrica (TSH en inglés, amount of total static head) o una cantidad monetaria, ya que TSH es Tanzanian Shilling, el chelín tanzano. Esta indeterminación en el significado de la variable podría causar problemas más adelante, sería necesaria más información al respecto. Caracterizado como `double`, en cualquiera de los casos, este tipo sería el correcto.
+
+-   **public_meeting**: vemos con un primer análisis que esta variable presenta NA.
+
+-   **num_private**: parece ser una variable que vale 0 para todas las bombas de agua.
+
+Nada destacable del resto de variables.
+
+## Procesado y limpieza de datos
+
+No podemos asegurar, debido al tamaño del dataset, que existan más valores NA en el resto de variables. Por esta razón, vamos a calcular el porcentaje y la cantidad de valores NA con el siguiente fragmento de código:
+
+```{r NA porcentaje}
+library(skimr) # cargamos el paquete de la función skim()
+library(formattable)
+
+df$date_recorded <- as.Date(df$date_recorded, format = "%Y-%m-%d") # Estandarizamos el formato de fecha para evitar errores futuros
+desc_df = skim(df)
+
+
+var_type_missing_df <- desc_df %>%
+  mutate(n_missing_perc = 100 * round(1-complete_rate, 3)) %>%
+  select(skim_type, skim_variable, n_missing, n_missing_perc) %>%
+  arrange(skim_type, n_missing)
+
+formattable(var_type_missing_df)
+```
+
+Vemos de la tabla anterior que solamente las variables `permit` y `public_meeting` contienen valores NA. Más concretamente:
+
+-   La variable `permit` contiene 3056 valores NA, lo que supone un $5.1\%$ sobre el total de datos del dataset.
+-   La variable `public_meeting`contiene 3334 valores NA, lo que supone un $5.6\%$ sobre el total de datos del dataset.
+
+Vamos a hacer limpieza de los datos, las explicaciones pertinentes aparecen como comentarios en los códigos.
+
+```{r num-private}
+#La columna num_private sólo contiene valores 0, la eliminamos
+df$num_private = NULL
+```
+
+```{r installer}
+#Las celdas sin valor (celdas vacías) las sustituimos por Not Known y los valores Not known por Not Known para unificar
+df$installer[df$installer == ""] <- "Not Known"
+df$installer[df$installer == "Not known"] <- "Not Known"
+```
+
+```{r latitud}
+# Calcular la media de la columna (excluyendo el valor específico -0.00000002)
+mediaLatitud <- mean(df$latitude[df$latitude != -0.00000002], na.rm = TRUE)
+# Sustituir el valor específico por la media
+df$latitude[df$latitude == -0.00000002] <- mediaLatitud
+```
+
+```{r longitud}
+# Calcular la media de la columna (excluyendo el valor específico 0.00000)
+mediaLong <- mean(df$longitude[df$longitude != 0.00000], na.rm = TRUE)
+# Sustituir el valor específico por la media
+df$longitude[df$longitude == 0.00000] <- mediaLong
+```
+
+```{r funder}
+#Las celdas sin valor (celdas vacías) las sustituimos por Not Known
+df$wpt_name[df$wpt_name == "none"] <- "Not Known"
+df$wpt_name[df$wpt_name == "None"] <- "Not Known"
+df$wpt_name[df$wpt_name == ""] <- "Not Known"
+```
+
+```{r subvillage}
+#Las celdas sin valor (celdas vacías) las sustituimos por Not Known
+df$subvillage[df$subvillage == "none"] <- "Not Known"
+df$subvillage[df$subvillage == "None"] <- "Not Known"
+df$subvillage[df$subvillage == ""] <- "Not Known"
+```
+
+```{r region}
+#Las celdas sin valor (celdas vacías) las sustituimos por Not Known
+df$region[df$region == "none"] <- "Not Known"
+df$region[df$region == "None"] <- "Not Known"
+df$region[df$region == ""] <- "Not Known"
+```
+
+```{r scheme management}
+#Las celdas sin valor (celdas vacías) las sustituimos por Not Known
+df$scheme_management[df$scheme_management == "none"] <- "Not Known"
+df$scheme_management[df$scheme_management == "None"] <- "Not Known"
+df$scheme_management[df$scheme_management == ""] <- "Not Known"
+```
+
+```{r scheme name}
+#Las celdas sin valor (celdas vacías) las sustituimos por Not Known
+df$scheme_name[df$scheme_name == "none"] <- "Not Known"
+df$scheme_name[df$scheme_name == "None"] <- "Not Known"
+df$scheme_name[df$scheme_name == ""] <- "Not Known"
+```
+
+```{r public meeting}
+#Las celdas con Na. TRUE/FALSE las sustituimos por un 3er estado NOT KNOWN
+df$public_meeting[is.na(df$public_meeting)] <- "NOT KNOWN"
+df$public_meeting[df$public_meeting == ""] <- "NOT KNOWN"
+```
+
+```{r permit}
+#Las celdas con Na. TRUE/FALSE las sustituimos por un 3er estado NOT KNOWN
+df$permit[is.na(df$permit)] <- "NOT KNOWN"
+df$permit[df$permit == ""] <- "NOT KNOWN"
+```
+
+# Análisis
+
+Primero, nos aseguramos de que nuestro dataset está en formato `data.table`.
+
+```{r df datatable}
+dfBombas = as.data.table(df)
+```
+
+Nos planteamos diversas preguntas para abordar el dataset.
+
+## ¿Es posible visualizar dónde se situa cada bomba de agua geográficamente?
+
+Para abordar esta pregunta hacemos uso de los datos relativos a las coordenadas geográficas de nuestro dataset (latitud y longitud) que nos permiten localizar las bombas de agua en un mapa. En primer lugar, podemos hacer una representación estática donde obtendremos el contorno de Tanzania y la localización de las bombas de agua en función de la región a la que pertenecen. Es una representación muy útil para hacernos una idea de qué región posee más bombas de agua. Usamos las variables `latitude` y `longitude`.
+
+```{r mapa geográfico bombas}
+#Podemos visualizar dónde están cada uno de los pozos por región en Tanzania
+dfBombas$region <- as.factor(dfBombas$region)
+
+ggplot(dfBombas, aes(x = dfBombas$longitude, y = dfBombas$latitude, color = region)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "Mapa de Pozos por Región",
+       x = "Longitud",
+       y = "Latitud",
+       color = "Región")
+```
+
+Como vemos, en primera instancia parece que la región de **Iringa** tiene una **mayor densidad de bombas de agua**, así como la región de **Mbeya** (afirmamos esto por la aparente densidad de los puntos de color del gráfico). Asimismo, parece que la región de **Rukwa** y **Dar es Salaam** son las que **menos número de bombas tienen**.
+
+Podemos crear también un mapa interactivo con Tanzania de fondo para una mayor comprensión y visualización de la localización de todas las bombas de agua y que nos permitirá ver si tienen una fuente de agua o más (no subterránea) en cada una de las regiones.
+
+```{r interactivo}
+# Cargar el paquete leaflet
+library(leaflet)
+
+# Crear un mapa interactivo
+leaflet(dfBombas) %>%
+  addTiles() %>%
+  addCircleMarkers(~longitude, ~latitude, color = ~region, radius = 5,
+                   popup = ~region)
+```
+
+Vemos que la localización de bombas de agua abunda en las regiones que están próximas a **lagos** y estarán localizadas donde exista agua apta para el consumo y no proveniente del océano (agua salada). Vemos una alta concentración de bombas en las regiones que lindan con el **Lago Victoria, el Lago Rukwa y el Lago Tanganyika**, entre otros.
+
+## ¿Cuáles son las regiones de Tanzania que tienen un mayor número de bombas de agua?
+
+```{r contar bombas de agua por región}
+conteoRegion = table(dfBombas$region)
+formattable(conteoRegion)
+```
+
+Vemos la tabla de frecuencias correspondientes a la cantidad de bombas de agua por región. Vamos a ver qué región tiene más bombas de agua. Para ello realizamos un conteo.
+
+```{r maximo región}
+# Obtener el valor máximo de la tabla de frecuencias
+valor_maximo = max(conteoRegion)
+
+# Encontrar las categorías asociadas al valor máximo
+categorias_maximas = names(conteoRegion[conteoRegion == valor_maximo])
+
+# Mostrar el resultado
+cat("El valor máximo es:", valor_maximo, "y corresponde a la(s) categoría(s):", categorias_maximas, "\n")
+```
+
+Obtenemos que **la región con más bombas de agua es Iringa con 5294**.
+
+## ¿Cuál es la región que tiene un menor número de bombas de agua?
+
+Podemos seguir el mismo proceso que antes para averiguar qué región es la que menos bombas de agua tiene.
+
+```{r mínimo región}
+# Obtener el valor máximo de la tabla de frecuencias
+valor_min = min(conteoRegion)
+
+# Encontrar las categorías asociadas al valor máximo
+categorias_min = names(conteoRegion[conteoRegion == valor_min])
+
+# Mostrar el resultado
+cat("El valor máximo es:", valor_min, "y corresponde a la(s) categoría(s):", categorias_min, "\n")
+```
+
+Obtenemos que **la región con menos bombas de agua es Dar es Salaam con 805**.
+
+# ¿Número de bombas de agua por región?
+
+Es posible ver gráficamente la distribución de bombas de agua por región haciendo uso de un gráfico de barras. Lo representamos:
+
+```{r gráfico por región}
+# Ordenar la tabla de frecuencias de mayor a menor
+tabla_ordenada <- sort(conteoRegion, decreasing = TRUE)
+
+
+# Crear el gráfico de barras horizontal
+barplot_heights <- barplot(tabla_ordenada, main = "Bombas de Agua por Región (Tanzania)", horiz = TRUE, 
+                           xlab = "Cantidad de Bombas de Agua", col = "lightblue", las = 1)
+
+# Añadir etiquetas con las cantidades sobre las barras
+text(x = tabla_ordenada, y = barplot_heights, labels = tabla_ordenada, pos = 4, cex = 0.8, col = "black")
+
+```
+
+Vemos en el gráfico anterior las regiones ordenadas de menor cantidad de bombas de agua a mayor, como podemos ver, gracias a las etiquetas en cada barra.
+
+## ¿Distribución de la construcción de las bombas de agua en función del año?
+
+Vamos a realizar en primer lugar un conteo de las bombas en función del año. Para ello, construimos una tabla de frecuencias.
+
+```{r años}
+
+# Contar las bombas por año
+bombasYear = table(dfBombas$construction_year)
+
+# Mostrar la tabla con los años y las frecuencias
+print(bombasYear)
+
+# Visualizar en un gráfico de barras
+barplot(bombasYear, main = "Cantidad de Bombas de Agua Construidas por Año",
+        xlab = "Año", ylab = "Cantidad", col = "lightgreen", las = 2, cex.names = 0.8)
+
+```
+
+Como vemos existe una gran cantidad de bombas construidas en el **año 0,** esto nos indica que existe un gran cantidad de bombas de agua que tienen un año de construcción **desconocido**. Eliminar las filas con años 0 no es una opción ya que estaríamos perdiendo mucha información. Por ello, para obtener una cierta información sobre la distribución de la cantidad de bombas de agua en función del año de construcción, vamos a representar el gráfico anterior eliminando el dato 0.
+
+# ¿Distribución no sesgada de la construcción de bombas de agua en función del año?
+
+Eliminamos de nuestro gráfico anterior el año 0 (solamente del gráfico, no del dataset).
+
+```{r grafico sin año 0}
+# Crear la tabla de frecuencias por año
+bombasYear = table(dfBombas$construction_year)
+
+# Excluir el año 0 solo de la representación gráfica
+bombasYear_filtrado = bombasYear[names(bombasYear) != "0"]
+
+# Visualizar en un gráfico de barras sin incluir el año 0
+barplot(bombasYear_filtrado, main = "Cantidad de Bombas de Agua Construidas por Año (Sin Año 0)",
+        xlab = "Año", ylab = "Cantidad", col = "lightgreen", las = 2, cex.names = 0.8) 
+  
+
+```
+
+Como vemos, eliminando el "año 0" obtenemos una información no sesgada que nos permite visualizar la "realidad" sobre los años de construcción de las bombas. Vemos que **a partir de la década de los años 90** existe una tendencia al **alza** de construcción de bombas de agua. Puede ser debida a la evolución de las tecnologías o a que han tenido acceso a las mismas para explotar sus propias fuentes de agua. Calculamos a continuación el año con un mayor número de bombas construidas.
+
+```{r estadistico year}
+# Encontrar el año con más bombas construidas
+yearMax = names(bombasYear_filtrado[which.max(bombasYear_filtrado)])
+
+# Mostrar el resultado
+cat("El año con mayor número de bombas construidas es:", yearMax, "con", max(bombasYear_filtrado), "bombas.\n")
+```
+
+Como vemos, el **año 2010 tiene el máximo de bombas de agua construidas con** $2645$. También es preciso calcular el año con menos construcciones de bombas.
+
+```{r estadistico year1}
+# Encontrar el año con menos bombas construidas
+yearMin = names(bombasYear_filtrado[which.min(bombasYear_filtrado)])
+
+# Mostrar el resultado
+cat("El año con menor número de bombas construidas es:", yearMin, "con", min(bombasYear_filtrado), "bombas.\n")
+```
+
+Es lógico, que el año con menor construcciones de bombas se encuentre fuera de la región con tendencia al alza de construcción de bombas (a partir de la década de los 90), siendo este **año 1966 con solamente 17 bombas de agua cosntruidas**.
+
+## ¿ Se sitúan las bombas en función de la depresión geográfica? `Region` comparada con `basin`
+
+Vamos a analizar la región con el tipo de depresión geográfica en la que se encuentran las bombas. Para ello, relacionamos la variable `region` con la variable `basin`. Mostramos la tabla de frecuencias para hacernos una idea inicial de lo que analizamos.
+
+```{r regionbasin}
+# Contar la cantidad de bombas por región y cuenca (basin)
+conteo_por_region_basin <- table(dfBombas$region, dfBombas$basin)
+
+# Mostrar el resultado
+formattable(conteo_por_region_basin)
+
+```
+
+La tabla anterior nos permite visualizar cuántas bombas de agua hay en cada región (como en el análisis anterior) y cómo están distribuidas, es decir, de dónde toman el agua dependiendo de las fuentes de la misma que haya en cada región. Calculamos en forma de porcentajes la información que nos proporciona la tabla de frecuencias anterior.
+
+```{r porcentajes basinregion}
+porcentajes_por_fila <- prop.table(conteo_por_region_basin, margin = 1) * 100
+porcentajes_por_fila
+
+```
+
+Como vemos, por ejemplo, la región de **Dar es Salaam** **tiene todas sus bombas tomando agua de los ríos Wami/Ruvu, se corresponderá con la única fuente de la que pueden obtener el agua**. Lo mismo ocurre con la región **Kigoma que tiene todas sus bombas localizadas en el Lago Tanganyika**. Vemos que el resto de regiones toman el agua de diversas fuentes, lo que nos da información del diferente acceso a fuentes de agua de las distintas regiones que conforman el país de Tanzania. Podemos visualizar lo anterior si hacemos uso de un mapa de calor:
+
+```{r regionbasin graf}
+
+heatmap(conteo_por_region_basin, main = "Bombas de Agua por Región y Cuenca", col = heat.colors(20), scale = "none", 
+        xlab = "Cuenca (Basin)", ylab = "Región")
+legend("topright",               
+       legend = c("Low", "Medium", "High"),
+       fill = heat.colors(3),    
+       title = "Density Level")   
+```
+
+## ¿Calidad del agua que extraen las bombas de las distintas regiones? ¿Cómo se distribuyen?
+
+Resulta también interesante evaluar la calidad del agua en las distintas regiones y posteriormente, ver si coincide con las regiones que más bombas de agua tienen.
+
+```{r calidad agua regiones}
+#Realizamos una tabla de frecuencias para relacionar ambas magnitudes
+tablaRegCal = table(dfBombas$region, dfBombas$quality_group)
+formattable(tablaRegCal)
+
+```
+
+La región con un mayor número de bombas que extraen agua de buena calidad es **Iringa con** $5226$**, seguida por Mbeya con** $4355$ **y Kilimanjaro con** $4262$**.**
+
+Vemos de los datos obtenidos que el agua obtenida por las bombas de la gran mayoría de las regiones tiene una buena calidad (good), salvo las regiones de Dar es Salaam y Lindi que tienen un menor número de bombas con buena calidad de agua. Pero es necesario analizar estas dos regiones en perspectiva.
+
+-   **La región de Dar es Salaam**. Hemos visto anteriormente que esta región tiene un total de $805$ bombas de agua, esto implica que un porcentaje importante, el $67.2\%$, de sus bombas extraen agua de buena calidad.
+
+-   **La región de Lindi**. De nuestro análisis anterior, hemos obtenido que esta región tiene $1546$ extrayendo agua. Esto quiere decir, que el $55.1\%$ de las bombas están extrayendo agua de buena calidad. La población obtiene su agua de buena calidad sólo de la mitad de las bombas que poseen.
+
+Sería interesante ver la tabla anterior en forma de porcentajes.
+
+```{r porcentaje calidad agua}
+porcentajeAguaCal = prop.table(tablaRegCal, margin = 1) * 100
+tablaFormatPorc = formattable(porcentajeAguaCal)
+tablaFormatPorc 
+```
+
+Vemos que el porcentaje para cada región de calidad de agua desconocida (unknown) es menor del $7\%$ (exceptuando la región de Singida con un $22.3\%$ y la región de Lindi con un $10.2\%$), por lo que podemos decir que en conjunto el porcentaje de datos desconocidos es aceptable.
+
+Calculamos el total de los pozos que tienen la calidad del agua "good" para evaluar la calidad del agua general que extraen todas las bombas de agua de Tanzania.
+
+```{r total calidad good}
+dataCal = data.frame(tablaRegCal)
+total_freq_good = sum(dataCal$Freq[dataCal$Var2 == "good"])
+print(total_freq_good)
+```
+
+Del total de las bombas de agua presentes en el país ($59400$), $50818$ extraen agua de calidad buena estaríamos hablando del $85.6\%$. Es decir, solamente el $14.4\%$ de las bombas no está proporcionando agua apta para el consumo.
+
+Podemos representar gráficamente el número de bombas de agua de cada región en función de la calidad del agua.
+
+```{r grafCal}
+
+# Crear el gráfico de barras apiladas
+ggplot(dataCal, aes(x = Var1, y = Freq, fill = Var2)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Núm bombas de agua vs. Región y calidad del agua",
+       x = "Región",
+       y = "Número de bombas de agua",
+       fill = "Calidad del agua") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Por ejemplo, vemos claramente que la región de **Iringa** tiene un mayor número de bombas de agua que la extraen de calidad buena, habíamos analizado anteriormente que la región de Iringa obtiene en su mayor parte su agua del río Rufiji por lo que suponemos que la calidad de agua de este río es buena. La siguen **Mbeya** (obtiene su agua de los lagos Nyasa y Rukwa) y **Kilimanjaro** que obtiene el $96\%$ de su agua del río Pangani.
+
+## ¿Está relacionada la calidad del agua con el tipo de agua que se extrae? `quality_group` y `water_quality`
+
+También puede ser interesante ver si la calidad del agua que hemos analizado en el apartado anterior tiene relación con el tipo de agua. Para ello, realizamos una tabla de frecuencias que relacione ambas variables.
+
+```{r calidad tipo agua}
+tablaCalTipo = table(dfBombas$quality_group, dfBombas$water_quality)
+tablaCalTipo
+
+```
+
+Vemos que si la calidad del agua es buena, está **directamente relacionado con que sea de tipo blanda**, es decir, hablamos de un agua que tiene baja concentración de minerales, es más suave y no deja residuos. Y, como vemos de la tabla anterior, obtenemos el mismo número de bombas de agua que extraían agua de calidad buena, $50818$.
+
+## ¿Densidad de población por regiones?
+
+Es interesante ver la densidad de población de las regiones y ver si coinciden con las regiones que tienen una mayor cantidad de bombas de agua y con la calidad de dicha agua. Para ello sumamos la población por regiones haciendo uso de las variables `population` y `region`.
+
+```{r pobl region}
+
+suma_poblacion <- aggregate(dfBombas$population ~ dfBombas$region, data = dfBombas, sum)
+print(suma_poblacion)
+
+
+```
+
+Para una mayor claridad, representamos gráficamente la tabla anterior:
+
+```{r graf pobl}
+ggplot(suma_poblacion, aes(x = reorder(`dfBombas$region`, -`dfBombas$population`), y = `dfBombas$population`, fill = `dfBombas$region`)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = `dfBombas$population`), vjust = -0.3, size = 3) +
+  labs(title = "Población por Región",
+       x = "Región",
+       y = "Población Total") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+```
+
+Las tres regiones con más población son **Kigoma**, **Mara** y **Morogoro**. Vamos a ver si existe relación entre la cantidad de población y la cantidad de bombas que extraen agua de calidad buena.
+
+-   Kigoma tiene 1.408.681 habitantes y 2738 bombas de agua.
+-   Mara tiene 1.060.886 habitantes y 1369 bombas de agua.
+-   Morogoro tiene 1.060.090 habitantes y 3167 bombas de agua.
+
+**No existe una aparente relación entre el número de población y la cantidad de bombas de agua que extraen dicha agua de buena calidad**. Además, si recordamos, la región de Iringa era la región que tenía un mayor número de bombas que extraen agua de calidad buena (5226) y tiene una población de 499.247.
+
+## ¿Cantidad de agua de la que dispone cada región en relación con el número de bombas de agua disponibles?
+
+Es interesante seguir con nuestro estudio y ver la cantidad de agua de la que dispone cada región, relacionarla con la población y de nuevo si es proporcional en relación con la cantidad de bombas que extraen agua de buena calidad.
+
+Creamos una tabla de frecuencias donde relacionamos la región (`region`) con la cantidad de agua (`quantity`) clasificada como dry, enough, insufficient, seasonal y unknown (seca, suficiente, insuficiente, estacional y desconocida).
+
+```{r region cantidad agua}
+tablaCantPob = table(dfBombas$quantity, dfBombas$region)
+tablaCantPob
+
+```
+
+```{r data frame calidad}
+tablaCantPob_df = data.frame(tablaCantPob)
+tablaCantPob_df
+```
+
+```{r grafico calidad agua}
+
+# Crear el gráfico de barras apiladas
+ggplot(tablaCantPob_df, aes(x = Var2, y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Cantidad de agua de cada región",
+       x = "Región",
+       y = "Número de bombas de agua",
+       fill = "Cantidad de agua") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Como vemos la región de **Iringa obtiene una cantidad de agua "suficiente"** para su población. Como hemos visto en el apartado anterior esta región medianamente poblada, comparada con Kigoma, Mara y Morogoro, **podríamos decir que obtiene más agua de la que necesita su población**. Si tuviéramos información de los litros de agua anuales que recogen las bombas de agua de calidad buena de la región de Iringa podríamos calcular cuántos litros de agua corresponderían a cada ciudadano y compararlos con la cantidad de litros/habitante de las tres regiones más pobladas (que serían **significativamente inferiore**s).
+
+## ¿Tienen todas las bombas de agua los permisos para funcionar?
+
+Realizamos a continuación el estudio de la proporción de bombas de agua que tienen permisos para funcionar. Para ello, empleamos en este caso la variable `permit`. Vamos a ver en primer lugar esta información numéricamente.
+
+```{r gráfico permisos}
+frecuencia = table(dfBombas$permit)
+frecuencia
+```
+
+Recordamos, teníamos 59400 bombas.
+
+```{r permit true}
+print((frecuencia["TRUE"]/nrow(dfBombas))*100)
+```
+
+Obtenemos que el 65% de las bombas tienen todos los permisos para funcionar, objetivamente, debería ser un porcentaje superior al 80%. Esto significa que el 30% no tienen permisos para funcionar, por lo que suponemos que se trata de construcciones ilegales.
+
+```{r permit false}
+print((frecuencia["FALSE"]/nrow(dfBombas))*100)
+```
+
+Vemos gráficamente las cantidades anteriores haciendo uso de un gráfico de barras.
+
+```{r graf4}
+
+frecuencia1 <- c("FALSE" = 17492, "NOT KNOWN" = 3056, "TRUE" = 38852)
+# Crear el barplot
+barplot_heights1= barplot(frecuencia,
+        main = "Frecuencia de valores en la columna 'status'",
+        xlab = "Valores",
+        ylab = "Frecuencia",
+        col = c("lightblue", "pink", "lightyellow"),
+        ylim = c(0,max(frecuencia)+10),
+        border = "black")
+```
