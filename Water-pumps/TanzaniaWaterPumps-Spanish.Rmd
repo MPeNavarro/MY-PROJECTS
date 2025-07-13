@@ -1,7 +1,6 @@
 ---
-title: "EVALUACIÓN MÓDULO 2B"
-author: "Marta Pellicer Navarro"
-date: "2025-03-18"
+title: "Análisis: Bombas de agua en Tanzania"
+author: "MPeNavarro"
 output: html_document
 ---
 
